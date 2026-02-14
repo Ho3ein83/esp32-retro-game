@@ -1,0 +1,89 @@
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_system.h"
+#include "esp_heap_caps.h"
+#include "esp_freertos_hooks.h"
+#include "driver/usb_serial_jtag.h"
+#include <stdio.h>
+#include <atomic>
+
+#define STATUS_LED  35
+#define TFT_DC      10
+#define TFT_RST     9
+#define TFT_SCLK    12
+#define TFT_MISO    13
+#define TFT_MOSI    11
+#define TFT_BL      21
+#define TFT_WIDTH   240
+#define TFT_HEIGHT  240
+#define SHOW_SPLASH false
+
+void memoryMonitor(void* pvParams){
+
+    while(true){
+        
+        // Free heap
+        size_t freeHeap = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+
+        // Minimum free heap ever since boot
+        // size_t minFreeHeap = heap_caps_get_minimum_free_size(MALLOC_CAP_DEFAULT);
+
+        // Max heap = free + used
+        size_t usedHeap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT) - freeHeap;
+        size_t maxHeap = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
+
+        // printf("$free_heap=%d\n", freeHeap);
+        // printf("$min_free_heap=%d\n", minFreeHeap);
+        // printf("$used_heap=%d\n", usedHeap);
+        // printf("$max_heap=%d\n", maxHeap);
+        printf("$heap=%d/%d\n", usedHeap, maxHeap);
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+    }
+
+}
+
+void loop(void* pvParams){
+
+    uint8_t readBuffer[1];
+
+    while(true){
+        
+        int read = usb_serial_jtag_read_bytes(readBuffer, sizeof(readBuffer), 10);
+        if(read){
+            vTaskDelay(1);
+            if(readBuffer[0] == 0xAA){
+                printf("#memory_monitor\n");
+            }
+        }
+
+        vTaskDelay(1);
+
+    }
+
+}
+
+extern "C" void app_main(void) {
+
+    usb_serial_jtag_driver_config_t config = USB_SERIAL_JTAG_DRIVER_CONFIG_DEFAULT();
+    esp_err_t err = usb_serial_jtag_driver_install(&config);
+    ESP_ERROR_CHECK(err);
+
+    // Start monitor first to measure baseline
+    xTaskCreate(memoryMonitor,
+                "memory_monitor",
+                4096,
+                nullptr,
+                1,
+                nullptr);
+
+    // Start main loop
+    xTaskCreate(loop,
+                "main_loop",
+                2048,
+                nullptr,
+                1,
+                nullptr);
+
+}

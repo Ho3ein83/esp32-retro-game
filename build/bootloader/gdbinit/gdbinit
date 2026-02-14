@@ -1,0 +1,2 @@
+source /home/hossein/Desktop/ESP-SPI-IDF/build/bootloader/gdbinit/symbols
+source /home/hossein/Desktop/ESP-SPI-IDF/build/bootloader/gdbinit/connect
